@@ -4,6 +4,7 @@ const RESTRICTED_PREFIXES = [
   'edge://',
   'about:',
   'view-source:',
+  'file://',
   'https://chrome.google.com/webstore',
   'https://chromewebstore.google.com',
 ]

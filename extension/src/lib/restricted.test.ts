@@ -11,6 +11,9 @@ describe('isRestrictedUrl', () => {
   it('flags undefined urls', () => {
     expect(isRestrictedUrl(undefined)).toBe(true)
   })
+  it('flags local file pages', () => {
+    expect(isRestrictedUrl('file:///Users/me/report.pdf')).toBe(true)
+  })
   it('allows normal http(s) pages', () => {
     expect(isRestrictedUrl('https://example.com/article')).toBe(false)
   })
