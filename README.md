@@ -26,6 +26,25 @@ cd backend && uv run pytest -v
 docker compose up --build backend
 ```
 
-## Extension
+## Extension (Chrome MV3)
+
+### Build & load
+```bash
+cd extension
+npm install
+npm run build
+```
+Then open `chrome://extensions`, enable Developer mode, click **Load unpacked**,
+and select `extension/dist`. Make sure the backend is running on `http://localhost:8000`.
+
+### Test
+```bash
+cd extension && npm run test
+```
+
+### Note on icons
+Toolbar/store icons are omitted for local dev (Chrome shows a default icon). Before
+publishing, add 16/48/128px PNGs under `extension/public/icons/` and reference them
+via an `icons` field in `manifest.config.ts`.
 
 See `docs/superpowers/plans/` for the extension implementation plan.
