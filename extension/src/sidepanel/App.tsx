@@ -16,17 +16,22 @@ export default function App() {
     setSummary('')
     setTruncated(false)
 
-    const result = (await chrome.runtime.sendMessage({
-      type: 'SUMMARIZE_ACTIVE_TAB',
-      options: { length },
-    })) as SummarizeResult
+    try {
+      const result = (await chrome.runtime.sendMessage({
+        type: 'SUMMARIZE_ACTIVE_TAB',
+        options: { length },
+      })) as SummarizeResult
 
-    if (result.ok) {
-      setSummary(result.data.summary)
-      setTruncated(result.data.truncated)
-      setStatus('done')
-    } else {
-      setError(result.error.message)
+      if (result.ok) {
+        setSummary(result.data.summary)
+        setTruncated(result.data.truncated)
+        setStatus('done')
+      } else {
+        setError(result.error.message)
+        setStatus('error')
+      }
+    } catch {
+      setError('Something went wrong. Try again.')
       setStatus('error')
     }
   }
