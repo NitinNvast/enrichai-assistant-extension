@@ -1,4 +1,6 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 from app.config import get_settings
 from app.errors import AppError
@@ -8,10 +10,12 @@ from app.schemas import SummarizeRequest, SummarizeResponse, Usage
 from app.tasks.summarize import build_messages
 
 router = APIRouter(prefix="/api")
+limiter = Limiter(key_func=get_remote_address)
 
 
 @router.post("/summarize", response_model=SummarizeResponse)
-def summarize(req: SummarizeRequest) -> SummarizeResponse:
+@limiter.limit(lambda: get_settings().rate_limit)
+def summarize(request: Request, req: SummarizeRequest) -> SummarizeResponse:
     settings = get_settings()
 
     # Defense-in-depth abuse ceiling (2x the soft budget).
