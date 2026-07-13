@@ -1,0 +1,29 @@
+# Dependencies
+**/node_modules/
+
+# Build output
+extension/dist/
+**/*.tsbuildinfo
+
+# Python
+**/__pycache__/
+*.pyc
+**/.venv/
+**/.pytest_cache/
+
+# Environment / secrets
+.env
+**/.env
+!**/.env.example
+
+# Logs
+*.log
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Claude Code local state
+.claude/worktrees/
