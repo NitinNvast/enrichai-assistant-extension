@@ -17,11 +17,20 @@ export function parseGuidelines(root: Document | Element, attributeName: string)
   // pagination) before or after the actual guidelines block. To avoid
   // silently picking up a list that has nothing to do with the heading,
   // restrict candidates to lists that come AFTER the heading in document
-  // order before choosing the last one.
+  // order. Additionally, bound the window from above: if another heading
+  // follows (e.g. a subsequent "Related Products" section still inside the
+  // same wide <main>/<article>), stop considering lists once past it, so a
+  // trailing unrelated list under a later heading is never mistaken for the
+  // "last" (i.e. real) list.
   const lists = Array.from(section.querySelectorAll('ul, ol'))
-  const candidateLists = heading
-    ? lists.filter((el) => (heading.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0)
-    : lists
+  let candidateLists = lists
+  if (heading) {
+    const headings = Array.from(section.querySelectorAll('h1, h2, h3, h4'))
+    const nextHeading = headings.find((el) => isBefore(heading, el))
+    candidateLists = lists.filter(
+      (el) => isBefore(heading, el) && (!nextHeading || isBefore(el, nextHeading)),
+    )
+  }
   const lastList = candidateLists[candidateLists.length - 1]
   const allowedValues = lastList
     ? Array.from(lastList.querySelectorAll('li'))
@@ -36,6 +45,11 @@ export function parseGuidelines(root: Document | Element, attributeName: string)
     .join(' ')
 
   return { attributeName, instructions, allowedValues }
+}
+
+// True when `a` precedes `b` in document order (i.e. `b` follows `a`).
+function isBefore(a: Element, b: Element): boolean {
+  return (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0
 }
 
 interface GuidelinesSection {
