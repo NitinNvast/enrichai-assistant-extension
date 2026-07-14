@@ -1,126 +1,109 @@
 import { useEffect, useState } from 'react'
-import type { SummarizeResult, SummaryLength } from '../types'
-import {
-  addHistory,
-  clearHistory,
-  loadHistory,
-  type HistoryEntry,
-} from '../lib/storage'
+import { readState, subscribeState } from '../lib/state'
+import type { DetectionState, ExtractCommand, ExtractRequest, ExtractResult } from '../types'
 
-type Status = 'idle' | 'loading' | 'done' | 'error'
+type Phase = 'idle' | 'loading' | 'done' | 'error'
 
-function makeId(url: string): string {
-  return `${url}::${performance.now()}`
+async function getActiveTabId(): Promise<number | undefined> {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
+  return tab?.id
+}
+
+function buildPayload(state: DetectionState): ExtractRequest | null {
+  const { context, guidelines, product } = state
+  if (!context?.attributeName || !guidelines || !product) return null
+  return {
+    attributeName: context.attributeName,
+    guidelines: { instructions: guidelines.instructions, allowedValues: guidelines.allowedValues },
+    product: { name: product.productName, description: product.description, specifications: product.specifications },
+    context: { projectId: context.projectId, catalogId: context.catalogId, terminalNodeId: context.terminalNodeId },
+  }
 }
 
 export default function App() {
-  const [status, setStatus] = useState<Status>('idle')
-  const [summary, setSummary] = useState('')
+  const [state, setState] = useState<DetectionState | null>(null)
+  const [phase, setPhase] = useState<Phase>('idle')
+  const [result, setResult] = useState<{ attribute: string; classification: string } | null>(null)
   const [error, setError] = useState('')
-  const [truncated, setTruncated] = useState(false)
-  const [length, setLength] = useState<SummaryLength>('medium')
-  const [history, setHistory] = useState<HistoryEntry[]>([])
 
   useEffect(() => {
-    loadHistory().then(setHistory)
+    let unsub = () => {}
+    getActiveTabId().then((tabId) => {
+      if (tabId === undefined) return
+      readState(tabId).then(setState)
+      unsub = subscribeState(tabId, setState)
+    })
+    return () => unsub()
   }, [])
 
-  async function onSummarize() {
-    setStatus('loading')
+  const payload = state ? buildPayload(state) : null
+  const canExtract = payload !== null && phase !== 'loading'
+
+  async function onExtract() {
+    if (!payload) return
+    setPhase('loading')
     setError('')
-    setSummary('')
-    setTruncated(false)
-
+    setResult(null)
+    const msg: ExtractCommand = { type: 'EXTRACT_ATTRIBUTE', payload }
     try {
-      const result = (await chrome.runtime.sendMessage({
-        type: 'SUMMARIZE_ACTIVE_TAB',
-        options: { length },
-      })) as SummarizeResult
-
-      if (result.ok) {
-        setSummary(result.data.summary)
-        setTruncated(result.data.truncated)
-        setStatus('done')
-        const entry: HistoryEntry = {
-          id: makeId(result.page.url),
-          url: result.page.url,
-          title: result.page.title,
-          summary: result.data.summary,
-          model: result.data.model,
-          createdAt: Date.now(),
-        }
-        setHistory(await addHistory(entry))
+      const res = (await chrome.runtime.sendMessage(msg)) as ExtractResult
+      if (res.ok) {
+        setResult({ attribute: res.data.attribute, classification: res.data.classification })
+        setPhase('done')
       } else {
-        setError(result.error.message)
-        setStatus('error')
+        setError(res.error.message)
+        setPhase('error')
       }
     } catch {
       setError('Something went wrong. Try again.')
-      setStatus('error')
+      setPhase('error')
     }
-  }
-
-  async function onClearHistory() {
-    await clearHistory()
-    setHistory([])
   }
 
   return (
     <div className="flex h-screen flex-col gap-3 p-4 text-sm">
-      <h1 className="text-base font-semibold">AI Page Summarizer</h1>
+      <h1 className="text-base font-semibold">EnrichAI Assistant</h1>
 
-      <div className="flex items-center gap-2">
-        <select
-          value={length}
-          onChange={(e) => setLength(e.target.value as SummaryLength)}
-          className="rounded border px-2 py-1"
-          disabled={status === 'loading'}
-        >
-          <option value="short">Short</option>
-          <option value="medium">Medium</option>
-          <option value="long">Long</option>
-        </select>
-        <button
-          onClick={onSummarize}
-          disabled={status === 'loading'}
-          className="rounded bg-blue-600 px-3 py-1 text-white hover:bg-blue-700 disabled:opacity-50"
-        >
-          {status === 'loading' ? 'Summarizing…' : 'Summarize'}
-        </button>
-      </div>
-
-      {status === 'idle' && <p className="text-gray-500">Click Summarize to get started.</p>}
-      {status === 'error' && <p className="rounded bg-red-50 p-2 text-red-700">{error}</p>}
-      {status === 'done' && (
-        <div className="flex flex-col gap-2">
-          {truncated && (
-            <p className="text-xs text-amber-600">Note: only part of the page was summarized.</p>
-          )}
-          <div className="max-h-48 overflow-y-auto whitespace-pre-wrap rounded border p-3">
-            {summary}
-          </div>
-        </div>
+      {!state?.supportedPage && (
+        <p className="text-gray-500">Waiting for product page…<br />No product detected.</p>
       )}
 
-      {history.length > 0 && (
-        <div className="flex min-h-0 flex-1 flex-col gap-2">
-          <div className="flex items-center justify-between">
-            <h2 className="font-medium">Recent</h2>
-            <button onClick={onClearHistory} className="text-xs text-gray-500 hover:underline">
-              Clear
-            </button>
-          </div>
-          <ul className="flex-1 overflow-y-auto">
-            {history.map((h) => (
-              <li key={h.id} className="border-b py-2">
-                <p className="truncate font-medium" title={h.title}>
-                  {h.title || h.url}
-                </p>
-                <p className="line-clamp-3 text-gray-600">{h.summary}</p>
-              </li>
-            ))}
+      {state?.supportedPage && state.guidelines && (
+        <section className="rounded border p-3">
+          <p className="font-medium text-green-700">Guidelines Detected ✓</p>
+          <p className="mt-1">Attribute: <span className="font-medium">{state.guidelines.attributeName}</span></p>
+          <ul className="mt-1 list-inside list-disc text-gray-700">
+            {state.guidelines.allowedValues.map((v) => <li key={v}>{v}</li>)}
           </ul>
-        </div>
+        </section>
+      )}
+
+      {state?.supportedPage && state.product && (
+        <section className="rounded border p-3">
+          <p className="font-medium text-green-700">Product Detected ✓</p>
+          <p className="mt-1 font-medium">{state.product.productName}</p>
+          <p className="text-gray-600">{state.product.description}</p>
+          {state.context?.attributeName && (
+            <p className="mt-2">Target Attribute: <span className="font-medium">{state.context.attributeName}</span></p>
+          )}
+          <button
+            onClick={onExtract}
+            disabled={!canExtract}
+            className="mt-2 rounded bg-blue-600 px-3 py-1 text-white hover:bg-blue-700 disabled:opacity-50"
+          >
+            {phase === 'loading' ? 'Extracting…' : 'Extract Attribute'}
+          </button>
+        </section>
+      )}
+
+      {phase === 'error' && <p className="rounded bg-red-50 p-2 text-red-700">{error}</p>}
+
+      {phase === 'done' && result && (
+        <section className="rounded border p-3">
+          <p className="font-medium">Attribute Classification</p>
+          <p className="mt-1 text-gray-700">{result.attribute}</p>
+          <p className="mt-1 text-lg font-semibold">{result.classification || 'No confident value'}</p>
+        </section>
       )}
     </div>
   )
