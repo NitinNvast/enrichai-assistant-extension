@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { readState, subscribeState } from '../lib/state'
 import type { DetectionState, ExtractCommand, ExtractRequest, ExtractResult } from '../types'
 
@@ -20,20 +20,76 @@ function buildPayload(state: DetectionState): ExtractRequest | null {
   }
 }
 
+function identityOf(state: DetectionState | null): string {
+  return `${state?.product?.productName ?? ''}::${state?.context?.attributeName ?? ''}`
+}
+
 export default function App() {
   const [state, setState] = useState<DetectionState | null>(null)
   const [phase, setPhase] = useState<Phase>('idle')
   const [result, setResult] = useState<{ attribute: string; classification: string } | null>(null)
   const [error, setError] = useState('')
+  // Identity (product + attribute) that the current `result`/`error` belongs to. Cleared
+  // whenever a new DetectionState arrives for a different product/attribute so stale
+  // results don't linger across product changes, modal reopen, or navigation.
+  const resultIdentityRef = useRef<string | null>(null)
+
+  const identity = identityOf(state)
 
   useEffect(() => {
+    if (resultIdentityRef.current !== null && resultIdentityRef.current !== identity) {
+      setPhase('idle')
+      setResult(null)
+      setError('')
+      resultIdentityRef.current = null
+    }
+  }, [identity])
+
+  useEffect(() => {
+    let cancelled = false
     let unsub = () => {}
-    getActiveTabId().then((tabId) => {
-      if (tabId === undefined) return
-      readState(tabId).then(setState)
-      unsub = subscribeState(tabId, setState)
-    })
-    return () => unsub()
+
+    function subscribeToTab(tabId: number) {
+      readState(tabId)
+        .then((s) => {
+          if (!cancelled) setState(s)
+        })
+        .catch(() => {})
+
+      const u = subscribeState(tabId, setState)
+      if (cancelled) {
+        u()
+      } else {
+        unsub = u
+      }
+    }
+
+    function onActivated() {
+      getActiveTabId()
+        .then((tabId) => {
+          if (cancelled || tabId === undefined) return
+          unsub()
+          unsub = () => {}
+          setState(null)
+          subscribeToTab(tabId)
+        })
+        .catch(() => {})
+    }
+
+    getActiveTabId()
+      .then((tabId) => {
+        if (cancelled || tabId === undefined) return
+        subscribeToTab(tabId)
+      })
+      .catch(() => {})
+
+    chrome.tabs.onActivated.addListener(onActivated)
+
+    return () => {
+      cancelled = true
+      unsub()
+      chrome.tabs.onActivated.removeListener(onActivated)
+    }
   }, [])
 
   const payload = state ? buildPayload(state) : null
@@ -41,6 +97,7 @@ export default function App() {
 
   async function onExtract() {
     if (!payload) return
+    resultIdentityRef.current = identity
     setPhase('loading')
     setError('')
     setResult(null)
