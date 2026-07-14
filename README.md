@@ -1,7 +1,17 @@
-# AI-Powered Chrome Extension
+# EnrichAI Assistant
 
-Summarize any web page with an LLM. A Manifest V3 Chrome extension (side panel)
-backed by a FastAPI proxy that keeps the OpenAI key server-side.
+Detect and extract product attributes from e-commerce pages with structured LLM classification.
+A Manifest V3 Chrome extension (side panel) backed by a FastAPI proxy that keeps the OpenAI key server-side.
+
+Only runs on `cc.gbiqa.groupbycloud.com/enrich/enrichai/*` pages.
+
+## How it works
+
+1. **Detect**: The extension watches for attribute names (buttons, labels) on the product page.
+2. **Extract**: On click, it sends the attribute, product data, and page context to the backend.
+3. **Classify**: The backend uses OpenAI (defaults to `gpt-4o`) with structured output to return a single classified value.
+
+**Note**: DOM selectors in `extension/src/constants.ts` are placeholders to be tightened against live markup (see spec §15).
 
 ## Backend (FastAPI)
 
