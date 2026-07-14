@@ -10,7 +10,7 @@ from app.routers.extract import limiter
 
 def create_app() -> FastAPI:
     settings = get_settings()
-    app = FastAPI(title="AI Summarizer Backend")
+    app = FastAPI(title="EnrichAI Assistant Backend")
 
     app.state.limiter = limiter
 

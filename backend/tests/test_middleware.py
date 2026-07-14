@@ -17,7 +17,7 @@ BODY = {
 
 
 @pytest.fixture(autouse=True)
-def mock_openai(monkeypatch):
+def mock_classify(monkeypatch):
     monkeypatch.setattr(openai_client, "classify_attribute", lambda messages, model, allowed: "Wide")
 
 
