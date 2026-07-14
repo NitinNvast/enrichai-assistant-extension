@@ -33,8 +33,18 @@ export default function App() {
   // whenever a new DetectionState arrives for a different product/attribute so stale
   // results don't linger across product changes, modal reopen, or navigation.
   const resultIdentityRef = useRef<string | null>(null)
+  // Always mirrors the latest `identity`, independent of `resultIdentityRef` above. Used
+  // only by in-flight `onExtract` requests to detect, once their response arrives, whether
+  // the identity they were sent for is still the one currently displayed (e.g. the user
+  // may have switched tabs while the request was in flight). Do not conflate this with
+  // `resultIdentityRef`, which tracks what identity the *rendered result* belongs to.
+  const currentIdentityRef = useRef<string>('')
 
   const identity = identityOf(state)
+
+  useEffect(() => {
+    currentIdentityRef.current = identity
+  }, [identity])
 
   useEffect(() => {
     if (resultIdentityRef.current !== null && resultIdentityRef.current !== identity) {
@@ -47,17 +57,24 @@ export default function App() {
 
   useEffect(() => {
     let cancelled = false
+    // Monotonic counter identifying the "current" subscription attempt. Guards against the
+    // initial-mount subscribe chain and a later `onActivated` subscribe chain both resolving
+    // out of order and writing to `unsub`: each subscribeToTab call captures the generation
+    // in effect when it was invoked, and only assigns to `unsub` if that generation is still
+    // the latest one when its async work resolves — otherwise it tears down its own listener
+    // immediately instead of clobbering (and thereby orphaning) a newer one.
+    let generation = 0
     let unsub = () => {}
 
-    function subscribeToTab(tabId: number) {
+    function subscribeToTab(tabId: number, myGeneration: number) {
       readState(tabId)
         .then((s) => {
-          if (!cancelled) setState(s)
+          if (!cancelled && myGeneration === generation) setState(s)
         })
         .catch(() => {})
 
       const u = subscribeState(tabId, setState)
-      if (cancelled) {
+      if (cancelled || myGeneration !== generation) {
         u()
       } else {
         unsub = u
@@ -68,10 +85,11 @@ export default function App() {
       getActiveTabId()
         .then((tabId) => {
           if (cancelled || tabId === undefined) return
+          generation += 1
           unsub()
           unsub = () => {}
           setState(null)
-          subscribeToTab(tabId)
+          subscribeToTab(tabId, generation)
         })
         .catch(() => {})
     }
@@ -79,7 +97,7 @@ export default function App() {
     getActiveTabId()
       .then((tabId) => {
         if (cancelled || tabId === undefined) return
-        subscribeToTab(tabId)
+        subscribeToTab(tabId, generation)
       })
       .catch(() => {})
 
@@ -97,13 +115,18 @@ export default function App() {
 
   async function onExtract() {
     if (!payload) return
-    resultIdentityRef.current = identity
+    const requestIdentity = identity
+    resultIdentityRef.current = requestIdentity
     setPhase('loading')
     setError('')
     setResult(null)
     const msg: ExtractCommand = { type: 'EXTRACT_ATTRIBUTE', payload }
     try {
       const res = (await chrome.runtime.sendMessage(msg)) as ExtractResult
+      // The identity may have changed while this request was in flight (e.g. the user
+      // switched tabs). If so, this response is stale — drop it silently rather than
+      // resurrecting a result/error for a product/attribute that's no longer displayed.
+      if (requestIdentity !== currentIdentityRef.current) return
       if (res.ok) {
         setResult({ attribute: res.data.attribute, classification: res.data.classification })
         setPhase('done')
@@ -112,6 +135,7 @@ export default function App() {
         setPhase('error')
       }
     } catch {
+      if (requestIdentity !== currentIdentityRef.current) return
       setError('Something went wrong. Try again.')
       setPhase('error')
     }
