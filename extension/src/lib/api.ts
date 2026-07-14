@@ -1,6 +1,5 @@
-import type { ApiError, SummarizeRequest, SummarizeResponse } from '../types'
-
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:8000'
+import { BACKEND_URL } from '../constants'
+import type { ApiError, ExtractRequest, ExtractResponse } from '../types'
 
 export class ApiClientError extends Error {
   code: string
@@ -11,21 +10,21 @@ export class ApiClientError extends Error {
   }
 }
 
-export async function requestSummary(payload: SummarizeRequest): Promise<SummarizeResponse> {
+export async function requestExtraction(payload: ExtractRequest): Promise<ExtractResponse> {
   let resp: Response
   try {
-    resp = await fetch(`${BACKEND_URL}/api/summarize`, {
+    resp = await fetch(`${BACKEND_URL}/api/extract`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     })
   } catch {
-    throw new ApiClientError('network_error', 'Could not reach the summarizer service.')
+    throw new ApiClientError('network_error', 'Could not reach the extraction service.')
   }
 
   if (!resp.ok) {
     let code = 'upstream_error'
-    let message = 'The summarizer service returned an error.'
+    let message = 'The extraction service returned an error.'
     try {
       const body = (await resp.json()) as ApiError
       if (body.error?.code) code = body.error.code
@@ -36,5 +35,5 @@ export async function requestSummary(payload: SummarizeRequest): Promise<Summari
     throw new ApiClientError(code, message)
   }
 
-  return (await resp.json()) as SummarizeResponse
+  return (await resp.json()) as ExtractResponse
 }
