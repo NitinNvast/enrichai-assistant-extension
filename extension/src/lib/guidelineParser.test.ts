@@ -66,4 +66,22 @@ describe('parseGuidelines', () => {
       allowedValues: ['Narrow', 'Standard', 'Wide', 'Extra Wide'],
     })
   })
+
+  it('ignores unrelated lists that precede the heading in a broad fallback container', () => {
+    const doc = domFrom(`
+      <main>
+        <ul><li>Related Item A</li><li>Related Item B</li></ul>
+        <h2>Sizing Guidelines</h2>
+        <p>Classify shoe width using product title, description and specifications.</p>
+        <ol><li>Read the product title</li><li>Check the specifications table</li></ol>
+        <ul><li>Narrow</li><li>Standard</li><li>Wide</li></ul>
+      </main>
+    `)
+    const g = parseGuidelines(doc, 'Fit - Shoe Width')
+    expect(g).toEqual({
+      attributeName: 'Fit - Shoe Width',
+      instructions: 'Classify shoe width using product title, description and specifications.',
+      allowedValues: ['Narrow', 'Standard', 'Wide'],
+    })
+  })
 })
