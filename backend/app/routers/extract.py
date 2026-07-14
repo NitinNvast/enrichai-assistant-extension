@@ -1,0 +1,49 @@
+from fastapi import APIRouter, Request
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+
+from app.config import get_settings
+from app.errors import AppError
+from app.llm import openai_client
+from app.llm.openai_client import LLMError
+from app.schemas import ExtractRequest, ExtractResponse
+from app.tasks.extract import build_attribute_prompt
+
+router = APIRouter(prefix="/api")
+limiter = Limiter(key_func=get_remote_address)
+
+
+def _match_allowed(value: str, allowed: list[str]) -> str:
+    """Return the canonical allowed value matching `value` (case-insensitive), else ''."""
+    needle = value.strip().lower()
+    for candidate in allowed:
+        if candidate.lower() == needle:
+            return candidate
+    return ""
+
+
+@router.post("/extract", response_model=ExtractResponse)
+@limiter.limit(lambda: get_settings().rate_limit)
+def extract(request: Request, req: ExtractRequest) -> ExtractResponse:
+    try:
+        return _extract(req)
+    except AppError:
+        raise
+    except Exception:
+        raise AppError(500, "internal", "Something went wrong.")
+
+
+def _extract(req: ExtractRequest) -> ExtractResponse:
+    settings = get_settings()
+    messages = build_attribute_prompt(req.attributeName, req.guidelines, req.product)
+    try:
+        raw = openai_client.classify_attribute(messages, settings.openai_model, req.guidelines.allowedValues)
+    except LLMError:
+        raise AppError(502, "upstream_error", "The classification service failed.")
+
+    classification = _match_allowed(raw, req.guidelines.allowedValues)
+    return ExtractResponse(
+        attribute=req.attributeName,
+        classification=classification,
+        model=settings.openai_model,
+    )

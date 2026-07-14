@@ -4,8 +4,8 @@ from slowapi.errors import RateLimitExceeded
 
 from app.config import get_settings
 from app.errors import error_response, register_handlers
-from app.routers import health, summarize
-from app.routers.summarize import limiter
+from app.routers import health, extract
+from app.routers.extract import limiter
 
 
 def create_app() -> FastAPI:
@@ -28,7 +28,7 @@ def create_app() -> FastAPI:
 
     register_handlers(app)
     app.include_router(health.router)
-    app.include_router(summarize.router)
+    app.include_router(extract.router)
     return app
 
 
