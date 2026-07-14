@@ -59,10 +59,15 @@ export default function App() {
     let cancelled = false
     // Monotonic counter identifying the "current" subscription attempt. Guards against the
     // initial-mount subscribe chain and a later `onActivated` subscribe chain both resolving
-    // out of order and writing to `unsub`: each subscribeToTab call captures the generation
-    // in effect when it was invoked, and only assigns to `unsub` if that generation is still
-    // the latest one when its async work resolves — otherwise it tears down its own listener
-    // immediately instead of clobbering (and thereby orphaning) a newer one.
+    // out of order and writing to `unsub`. Each chain freezes its own `myGeneration` snapshot
+    // SYNCHRONOUSLY — before it starts its `getActiveTabId()` call, i.e. before the async gap
+    // in which a newer chain could start and bump `generation`. When the async gap resolves,
+    // the callback compares its frozen `myGeneration` against the (possibly since-bumped) live
+    // `generation`: if they differ, this chain is stale and bails out (or, inside
+    // subscribeToTab, tears down its own just-created listener) instead of clobbering — and
+    // thereby orphaning — a newer chain's `unsub`. Capturing the snapshot any later (e.g. only
+    // once the async work has already resolved) would make the comparison a tautology, since
+    // there is no further async gap between the capture and the check.
     let generation = 0
     let unsub = () => {}
 
@@ -82,22 +87,24 @@ export default function App() {
     }
 
     function onActivated() {
+      generation += 1
+      const myGeneration = generation
       getActiveTabId()
         .then((tabId) => {
-          if (cancelled || tabId === undefined) return
-          generation += 1
+          if (cancelled || tabId === undefined || myGeneration !== generation) return
           unsub()
           unsub = () => {}
           setState(null)
-          subscribeToTab(tabId, generation)
+          subscribeToTab(tabId, myGeneration)
         })
         .catch(() => {})
     }
 
+    const initialGeneration = generation
     getActiveTabId()
       .then((tabId) => {
         if (cancelled || tabId === undefined) return
-        subscribeToTab(tabId, generation)
+        subscribeToTab(tabId, initialGeneration)
       })
       .catch(() => {})
 
