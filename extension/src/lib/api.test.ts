@@ -14,11 +14,11 @@ afterEach(() => vi.unstubAllGlobals())
 describe('requestExtraction', () => {
   it('returns parsed data on success', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(
-      JSON.stringify({ attribute: 'Fit - Shoe Width', classification: 'Wide', model: 'gpt-4o' }),
+      JSON.stringify({ attribute: 'Fit - Shoe Width', classifications: ['Wide'], model: 'gpt-4o' }),
       { status: 200, headers: { 'Content-Type': 'application/json' } },
     )))
     const data = await requestExtraction(PAYLOAD)
-    expect(data.classification).toBe('Wide')
+    expect(data.classifications).toEqual(['Wide'])
   })
 
   it('throws ApiClientError with the backend error code', async () => {

@@ -30,7 +30,7 @@ function identityOf(state: DetectionState | null): string {
 export default function App() {
   const [state, setState] = useState<DetectionState | null>(null)
   const [phase, setPhase] = useState<Phase>('idle')
-  const [result, setResult] = useState<{ attribute: string; classification: string } | null>(null)
+  const [result, setResult] = useState<{ attribute: string; classifications: string[] } | null>(null)
   const [error, setError] = useState('')
   // Identity (product + attribute) that the current `result`/`error` belongs to. Cleared
   // whenever a new DetectionState arrives for a different product/attribute so stale
@@ -138,7 +138,7 @@ export default function App() {
       // resurrecting a result/error for a product/attribute that's no longer displayed.
       if (requestIdentity !== currentIdentityRef.current) return
       if (res.ok) {
-        setResult({ attribute: res.data.attribute, classification: res.data.classification })
+        setResult({ attribute: res.data.attribute, classifications: res.data.classifications })
         setPhase('done')
       } else {
         setError(res.error.message)
@@ -198,7 +198,15 @@ export default function App() {
         <section className="rounded border p-3">
           <p className="font-medium">Attribute Classification</p>
           <p className="mt-1 text-gray-700">{result.attribute}</p>
-          <p className="mt-1 text-lg font-semibold">{result.classification || 'No confident value'}</p>
+          {result.classifications.length ? (
+            <ul className="mt-1 list-inside list-disc text-lg font-semibold">
+              {result.classifications.map((v) => (
+                <li key={v}>{v}</li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-1 text-lg font-semibold text-gray-500">No confident value</p>
+          )}
         </section>
       )}
     </div>

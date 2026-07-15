@@ -42,7 +42,7 @@ export interface ExtractRequest {
 
 export interface ExtractResponse {
   attribute: string
-  classification: string
+  classifications: string[]
   model: string
 }
 
