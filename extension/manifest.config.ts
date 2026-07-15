@@ -3,7 +3,8 @@ import { defineManifest } from '@crxjs/vite-plugin'
 export default defineManifest({
   manifest_version: 3,
   name: 'EnrichAI Assistant',
-  version: '0.1.0',
+  version: '1.0.0',
+
   description: 'Classify product attributes on the GroupBy EnrichAI application with AI.',
   action: { default_title: 'Open EnrichAI Assistant' },
   background: { service_worker: 'src/background/index.ts', type: 'module' },
