@@ -7,7 +7,10 @@ SYSTEM_PROMPT = (
     "classify ONLY the single specified attribute. Return EVERY allowed value "
     "that applies based on the product details: if several apply, include all of "
     "them; if none applies confidently, return an empty list. Choose only from "
-    "the allowed values; never invent a value. Follow this decision order: "
+    "the allowed values; never invent a value. Base every decision only on the "
+    "provided product details; do not guess from general knowledge, brand, or "
+    "what is typical for the category. If the details do not explicitly state or "
+    "clearly imply a value, do not include it. Follow this decision order: "
     "Description, then Product Name, then Specifications, then Category."
 )
 
