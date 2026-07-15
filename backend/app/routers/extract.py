@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import APIRouter, Request
 from slowapi import Limiter
 from slowapi.util import get_remote_address
@@ -11,6 +13,7 @@ from app.tasks.extract import build_attribute_prompt
 
 router = APIRouter(prefix="/api")
 limiter = Limiter(key_func=get_remote_address)
+logger = logging.getLogger(__name__)
 
 
 def _match_allowed(value: str, allowed: list[str]) -> str:
@@ -46,8 +49,9 @@ def _extract(req: ExtractRequest) -> ExtractResponse:
     messages = build_attribute_prompt(req.attributeName, req.guidelines, req.product)
     try:
         raw = openai_client.classify_attribute(messages, settings.openai_model, req.guidelines.allowedValues)
-    except LLMError:
-        raise AppError(502, "upstream_error", "The classification service failed.")
+    except LLMError as exc:
+        logger.warning("classify_attribute failed (model=%s): %s", settings.openai_model, exc)
+        raise AppError(502, "upstream_error", "The classification service failed.") from exc
 
     classifications = _match_allowed_many(raw, req.guidelines.allowedValues)
     return ExtractResponse(

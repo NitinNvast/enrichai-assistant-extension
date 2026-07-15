@@ -16,13 +16,14 @@ def classify_attribute(messages: list[dict], model: str, allowed_values: list[st
     # Structured output: `classifications` is an array whose items are constrained
     # to the allowed values, so the model can return one, several, or none — but
     # never a value outside the vocabulary. An empty array means "nothing applies".
+    # NOTE: no `uniqueItems` — OpenAI strict structured outputs reject it. The
+    # route dedupes downstream (`_match_allowed_many`), so it isn't needed here.
     schema = {
         "type": "object",
         "properties": {
             "classifications": {
                 "type": "array",
                 "items": {"type": "string", "enum": allowed_values},
-                "uniqueItems": True,
             },
         },
         "required": ["classifications"],
