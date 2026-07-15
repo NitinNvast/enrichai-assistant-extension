@@ -1,32 +1,34 @@
-from typing import Literal
-
-from pydantic import BaseModel, Field, HttpUrl
-
-SummaryLength = Literal["short", "medium", "long"]
+from pydantic import BaseModel, Field
 
 
-class SummarizeOptions(BaseModel):
-    length: SummaryLength = "medium"
+class GuidelinesIn(BaseModel):
+    instructions: str = ""
+    allowedValues: list[str] = Field(min_length=1)
 
 
-class SummarizeRequest(BaseModel):
-    url: HttpUrl
-    title: str = Field(default="", max_length=500)
-    content: str = Field(min_length=1)
-    options: SummarizeOptions = Field(default_factory=SummarizeOptions)
+class ProductIn(BaseModel):
+    name: str = Field(min_length=1)
+    description: str = ""
+    specifications: dict[str, str] = Field(default_factory=dict)
 
 
-class Usage(BaseModel):
-    prompt_tokens: int = 0
-    completion_tokens: int = 0
-    total_tokens: int = 0
+class ContextIn(BaseModel):
+    projectId: str | None = None
+    catalogId: str | None = None
+    terminalNodeId: str | None = None
 
 
-class SummarizeResponse(BaseModel):
-    summary: str
+class ExtractRequest(BaseModel):
+    attributeName: str = Field(min_length=1)
+    guidelines: GuidelinesIn
+    product: ProductIn
+    context: ContextIn = Field(default_factory=ContextIn)
+
+
+class ExtractResponse(BaseModel):
+    attribute: str
+    classifications: list[str]
     model: str
-    usage: Usage
-    truncated: bool = False
 
 
 class ErrorBody(BaseModel):

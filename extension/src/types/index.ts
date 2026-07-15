@@ -1,53 +1,68 @@
-export type SummaryLength = 'short' | 'medium' | 'long'
-
-export interface SummarizeRequest {
-  url: string
-  title: string
-  content: string
-  options: { length: SummaryLength }
+export interface UrlContext {
+  projectId: string | null
+  catalogId: string | null
+  terminalNodeId: string | null
+  attributeName: string | null // [T] prefix stripped
 }
 
-export interface Usage {
-  prompt_tokens: number
-  completion_tokens: number
-  total_tokens: number
+// One allowed value plus the per-value note the guidelines panel shows beside
+// it (often empty). `note` is retained for the classifier's benefit; the wire
+// payload still sends only the bare `value` strings (see ExtractRequest) so the
+// backend's allowed-value validation matches exactly.
+export interface AllowedValue {
+  value: string
+  note: string
 }
 
-export interface SummarizeResponse {
-  summary: string
+export interface Guideline {
+  attributeName: string
+  instructions: string
+  allowedValues: AllowedValue[]
+}
+
+export interface Product {
+  productName: string
+  description: string
+  specifications: Record<string, string>
+}
+
+export interface DetectionState {
+  supportedPage: boolean
+  context: UrlContext | null
+  guidelines: Guideline | null
+  product: Product | null
+}
+
+export interface ExtractRequest {
+  attributeName: string
+  guidelines: { instructions: string; allowedValues: string[] }
+  product: { name: string; description: string; specifications: Record<string, string> }
+  context: { projectId: string | null; catalogId: string | null; terminalNodeId: string | null }
+}
+
+export interface ExtractResponse {
+  attribute: string
+  classifications: string[]
   model: string
-  usage: Usage
-  truncated: boolean
 }
 
 export interface ApiError {
   error: { code: string; message: string }
 }
 
-export interface ExtractedContent {
-  title: string
-  url: string
-  content: string
-  truncated: boolean
+// content script -> service worker
+export interface StateUpdateMessage {
+  type: 'STATE_UPDATE'
+  state: DetectionState
 }
 
 // side panel -> service worker
-export interface SummarizeCommand {
-  type: 'SUMMARIZE_ACTIVE_TAB'
-  options: { length: SummaryLength }
+export interface ExtractCommand {
+  type: 'EXTRACT_ATTRIBUTE'
+  payload: ExtractRequest
 }
 
 // service worker -> side panel
-export type SummarizeResult =
-  | { ok: true; data: SummarizeResponse; page: { title: string; url: string } }
-  | { ok: false; error: { code: string; message: string } }
-
-// service worker -> content script
-export interface ExtractCommand {
-  type: 'EXTRACT'
-}
-
-// content script -> service worker
 export type ExtractResult =
-  | { ok: true; data: ExtractedContent }
+  | { ok: true; data: ExtractResponse }
   | { ok: false; error: { code: string; message: string } }

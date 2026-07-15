@@ -1,55 +1,36 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { requestSummary } from './api'
-import type { SummarizeRequest } from '../types'
+import { ApiClientError, requestExtraction } from './api'
+import type { ExtractRequest } from '../types'
 
-const payload: SummarizeRequest = {
-  url: 'https://x.com',
-  title: 't',
-  content: 'c',
-  options: { length: 'short' },
+const PAYLOAD: ExtractRequest = {
+  attributeName: 'Fit - Shoe Width',
+  guidelines: { instructions: 'x', allowedValues: ['Wide'] },
+  product: { name: 'Shoe', description: 'd', specifications: {} },
+  context: { projectId: null, catalogId: null, terminalNodeId: null },
 }
 
-afterEach(() => vi.restoreAllMocks())
+afterEach(() => vi.unstubAllGlobals())
 
-describe('requestSummary', () => {
-  it('returns the parsed body on 200', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () =>
-        new Response(
-          JSON.stringify({
-            summary: 'S',
-            model: 'gpt-4o-mini',
-            usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
-            truncated: false,
-          }),
-          { status: 200 },
-        ),
-      ),
-    )
-    const res = await requestSummary(payload)
-    expect(res.summary).toBe('S')
+describe('requestExtraction', () => {
+  it('returns parsed data on success', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(
+      JSON.stringify({ attribute: 'Fit - Shoe Width', classifications: ['Wide'], model: 'gpt-4o' }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } },
+    )))
+    const data = await requestExtraction(PAYLOAD)
+    expect(data.classifications).toEqual(['Wide'])
   })
 
-  it('throws with the backend error code on non-200', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () =>
-        new Response(JSON.stringify({ error: { code: 'rate_limited', message: 'slow' } }), {
-          status: 429,
-        }),
-      ),
-    )
-    await expect(requestSummary(payload)).rejects.toMatchObject({ code: 'rate_limited' })
+  it('throws ApiClientError with the backend error code', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(
+      JSON.stringify({ error: { code: 'upstream_error', message: 'boom' } }),
+      { status: 502, headers: { 'Content-Type': 'application/json' } },
+    )))
+    await expect(requestExtraction(PAYLOAD)).rejects.toMatchObject({ code: 'upstream_error' })
   })
 
   it('throws network_error when fetch rejects', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => {
-        throw new Error('offline')
-      }),
-    )
-    await expect(requestSummary(payload)).rejects.toMatchObject({ code: 'network_error' })
+    vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('offline') }))
+    await expect(requestExtraction(PAYLOAD)).rejects.toBeInstanceOf(ApiClientError)
   })
 })
