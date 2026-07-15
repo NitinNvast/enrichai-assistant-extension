@@ -5,10 +5,19 @@ export interface UrlContext {
   attributeName: string | null // [T] prefix stripped
 }
 
+// One allowed value plus the per-value note the guidelines panel shows beside
+// it (often empty). `note` is retained for the classifier's benefit; the wire
+// payload still sends only the bare `value` strings (see ExtractRequest) so the
+// backend's allowed-value validation matches exactly.
+export interface AllowedValue {
+  value: string
+  note: string
+}
+
 export interface Guideline {
   attributeName: string
   instructions: string
-  allowedValues: string[]
+  allowedValues: AllowedValue[]
 }
 
 export interface Product {

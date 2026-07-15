@@ -1,77 +1,70 @@
-import { SELECTORS } from '../constants'
-import type { Guideline } from '../types'
+import type { AllowedValue, Guideline } from '../types'
 
+// The EnrichAI guidelines panel is a flat block: an "Instructions" sub-block
+// (an <h6>Instructions</h6> label next to a readonly <textarea>), followed by
+// one <div> per allowed value. Each value entry has a direct-child <h6> (the
+// value) and a direct-child <p> (a per-value note, frequently empty).
+//
+// The block carries no stable id or class — the host app ships styled-components
+// hashes that change every build — so we key off structure: value entries are
+// the only <div>s with both a direct <h6> and a direct <p>, and the real block
+// is the one holding the most of them (guarding against a stray heading/prose
+// pair elsewhere on the page).
 export function parseGuidelines(root: Document | Element, attributeName: string): Guideline | null {
-  const found = findGuidelinesSection(root)
-  if (!found) return null
-  const { section, heading } = found
+  const section = findGuidelinesSection(root)
+  if (!section) return null
 
-  // A section may contain multiple lists (e.g. an <ol> of instructions
-  // followed by the actual <ul> of allowed values). Only ever look inside
-  // <ul>/<ol> elements, and prefer the LAST list in the section — the
-  // common convention is prose/instructions first, allowed values last.
-  //
-  // When the section was found via the heading fallback (see
-  // findGuidelinesSection), the container can be a broad <main>/<article>
-  // that also holds unrelated content (e.g. a decoy list, related items,
-  // pagination) before or after the actual guidelines block. To avoid
-  // silently picking up a list that has nothing to do with the heading,
-  // restrict candidates to lists that come AFTER the heading in document
-  // order. Additionally, bound the window from above: if another heading
-  // follows (e.g. a subsequent "Related Products" section still inside the
-  // same wide <main>/<article>), stop considering lists once past it, so a
-  // trailing unrelated list under a later heading is never mistaken for the
-  // "last" (i.e. real) list.
-  const lists = Array.from(section.querySelectorAll('ul, ol'))
-  let candidateLists = lists
-  if (heading) {
-    const headings = Array.from(section.querySelectorAll('h1, h2, h3, h4'))
-    const nextHeading = headings.find((el) => isBefore(heading, el))
-    candidateLists = lists.filter(
-      (el) => isBefore(heading, el) && (!nextHeading || isBefore(el, nextHeading)),
-    )
-  }
-  const lastList = candidateLists[candidateLists.length - 1]
-  const allowedValues = lastList
-    ? Array.from(lastList.querySelectorAll('li'))
-        .map((li) => li.textContent?.trim() ?? '')
-        .filter(Boolean)
-    : []
+  const entries: AllowedValue[] = section.entries
+    .map((entry) => ({
+      value: entry.querySelector(':scope > h6')?.textContent?.trim() ?? '',
+      note: entry.querySelector(':scope > p')?.textContent?.trim() ?? '',
+    }))
+    .filter((v) => v.value)
+
+  // The block is prefixed by context headers — the product type, then a row for
+  // the attribute itself — before the real allowed values. The attribute row's
+  // value equals `attributeName`, so everything AFTER it is the true value list.
+  // Fall back to keeping all entries when no such marker is present, so an
+  // unexpected layout degrades to over-inclusion rather than dropping everything.
+  const markerIndex = entries.findIndex((v) => v.value === attributeName)
+  const allowedValues = markerIndex >= 0 ? entries.slice(markerIndex + 1) : entries
   if (allowedValues.length === 0) return null
 
-  const instructions = Array.from(section.querySelectorAll('p'))
-    .map((p) => p.textContent?.trim() ?? '')
-    .filter(Boolean)
-    .join(' ')
+  // Attribute-level instructions live in the readonly textarea's value, not in
+  // any per-value <p>. Empty is a legitimate result (the field is often blank).
+  const textarea = section.container.querySelector('textarea')
+  const instructions = (textarea instanceof HTMLTextAreaElement ? textarea.value : '').trim()
 
   return { attributeName, instructions, allowedValues }
 }
 
-// True when `a` precedes `b` in document order (i.e. `b` follows `a`).
-function isBefore(a: Element, b: Element): boolean {
-  return (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0
-}
-
 interface GuidelinesSection {
-  section: Element
-  // The heading that led to `section` being picked via the fallback path, or
-  // null when `section` came from the configured selector (in which case the
-  // whole section is trusted content and no document-position filtering is
-  // needed).
-  heading: Element | null
+  container: Element
+  entries: Element[]
 }
 
 function findGuidelinesSection(root: Document | Element): GuidelinesSection | null {
-  const configured = root.querySelector(SELECTORS.guidelinesSection)
-  if (configured) return { section: configured, heading: null }
-  // Fallback: a heading whose text mentions "guidelines".
-  // NOTE: this takes the FIRST matching heading with no disambiguation, so an
-  // earlier decoy heading (e.g. a nav breadcrumb reading "Guidelines") could be
-  // picked over the real content heading. Known limitation; a markup-informed
-  // pass is expected to tighten this later.
-  const headings = Array.from(root.querySelectorAll('h1, h2, h3, h4'))
-  const heading = headings.find((el) => /guidelines/i.test(el.textContent ?? ''))
-  if (!heading) return null
-  const section = heading.closest('section, div, main, article') ?? heading.parentElement
-  return section ? { section, heading } : null
+  const entries = Array.from(root.querySelectorAll('div')).filter(isValueEntry)
+  if (entries.length === 0) return null
+
+  // Group entries by their parent and take the parent with the most, so a lone
+  // decoy <div><h6/><p/></div> in an unrelated section can't win.
+  const byParent = new Map<Element, Element[]>()
+  for (const entry of entries) {
+    const parent = entry.parentElement
+    if (!parent) continue
+    const group = byParent.get(parent) ?? []
+    group.push(entry)
+    byParent.set(parent, group)
+  }
+
+  let best: GuidelinesSection | null = null
+  for (const [container, group] of byParent) {
+    if (!best || group.length > best.entries.length) best = { container, entries: group }
+  }
+  return best
+}
+
+function isValueEntry(el: Element): boolean {
+  return el.querySelector(':scope > h6') !== null && el.querySelector(':scope > p') !== null
 }

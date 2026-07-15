@@ -18,6 +18,12 @@ describe('parseUrlContext', () => {
   it('strips the [T] prefix from attributeName', () => {
     expect(parseUrlContext(URL_WITH_CONTEXT).attributeName).toBe('Fit - Shoe Width')
   })
+  it('decodes a double-encoded attributeName (the SPA re-encodes an already-encoded value)', () => {
+    const url =
+      'https://cc.gbiqa.groupbycloud.com/enrich/enrichai/hlqa?attributeName=' +
+      encodeURIComponent(encodeURIComponent('[T]Fit - Shoe Width'))
+    expect(parseUrlContext(url).attributeName).toBe('Fit - Shoe Width')
+  })
   it('returns nulls when params are absent', () => {
     const ctx = parseUrlContext('https://cc.gbiqa.groupbycloud.com/enrich/enrichai/hlqa')
     expect(ctx).toEqual({ projectId: null, catalogId: null, terminalNodeId: null, attributeName: null })

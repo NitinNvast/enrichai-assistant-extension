@@ -14,7 +14,10 @@ function buildPayload(state: DetectionState): ExtractRequest | null {
   if (!context?.attributeName || !guidelines || !product) return null
   return {
     attributeName: context.attributeName,
-    guidelines: { instructions: guidelines.instructions, allowedValues: guidelines.allowedValues },
+    guidelines: {
+      instructions: guidelines.instructions,
+      allowedValues: guidelines.allowedValues.map((v) => v.value),
+    },
     product: { name: product.productName, description: product.description, specifications: product.specifications },
     context: { projectId: context.projectId, catalogId: context.catalogId, terminalNodeId: context.terminalNodeId },
   }
@@ -161,7 +164,12 @@ export default function App() {
           <p className="font-medium text-green-700">Guidelines Detected ✓</p>
           <p className="mt-1">Attribute: <span className="font-medium">{state.guidelines.attributeName}</span></p>
           <ul className="mt-1 list-inside list-disc text-gray-700">
-            {state.guidelines.allowedValues.map((v) => <li key={v}>{v}</li>)}
+            {state.guidelines.allowedValues.map((v) => (
+              <li key={v.value}>
+                {v.value}
+                {v.note && <span className="text-gray-400"> — {v.note}</span>}
+              </li>
+            ))}
           </ul>
         </section>
       )}

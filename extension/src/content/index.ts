@@ -1,17 +1,9 @@
-import { SELECTORS } from '../constants'
 import { parseGuidelines } from '../lib/guidelineParser'
 import { parseProduct } from '../lib/productParser'
 import { isTargetPage } from '../lib/site'
 import { parseUrlContext } from '../lib/urlContext'
 import { watchDom } from '../lib/observer'
 import type { DetectionState, StateUpdateMessage } from '../types'
-
-const win = window as unknown as { __enrichAiLoaded?: boolean }
-
-if (!win.__enrichAiLoaded) {
-  win.__enrichAiLoaded = true
-  start()
-}
 
 function computeState(): DetectionState {
   const url = location.href
@@ -20,8 +12,7 @@ function computeState(): DetectionState {
   }
   const context = parseUrlContext(url)
   const guidelines = context.attributeName ? parseGuidelines(document, context.attributeName) : null
-  const modal = document.querySelector(SELECTORS.modal)
-  const product = modal ? parseProduct(modal) : null
+  const product = parseProduct(document)
   return { supportedPage: true, context, guidelines, product }
 }
 
@@ -56,4 +47,14 @@ function patchHistory(cb: () => void): void {
       return result
     } as History[typeof method]
   })
+}
+
+// Bootstrap LAST: `start()` transitively reads module-level state (e.g.
+// `lastSerialized`), so it must run only after every declaration above has been
+// initialized. Calling it earlier throws a temporal-dead-zone ReferenceError at
+// injection time. Guarded so the SPA's re-injections don't double-initialize.
+const win = window as unknown as { __enrichAiLoaded?: boolean }
+if (!win.__enrichAiLoaded) {
+  win.__enrichAiLoaded = true
+  start()
 }
