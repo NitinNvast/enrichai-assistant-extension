@@ -58,4 +58,4 @@ publishing, add 16/48/128px PNGs under `extension/public/icons/` and reference t
 via an `icons` field in `manifest.config.ts`.
 
 See `docs/superpowers/plans/` for the extension implementation plan.
-# ai-page-summarizer-extension
+# enrichai-assistant-extension
