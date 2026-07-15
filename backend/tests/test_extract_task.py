@@ -15,3 +15,11 @@ def test_prompt_includes_attribute_allowed_values_and_specs():
     assert "Classify width." in user
     assert "Nike Pegasus" in user
     assert "Fit: Wide Fit" in user
+
+
+def test_prompt_instructs_multi_value_selection():
+    guidelines = GuidelinesIn(instructions="x", allowedValues=["Narrow", "Wide"])
+    product = ProductIn(name="Shoe", description="d", specifications={})
+    system = build_attribute_prompt("Fit - Shoe Width", guidelines, product)[0]["content"]
+    assert "EVERY allowed value" in system
+    assert "empty list" in system
