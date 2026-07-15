@@ -1,11 +1,29 @@
 import { ApiClientError, requestExtraction } from '../lib/api'
 import { syncPanel } from '../lib/panel'
 import { reloadTargetHostTabs } from '../lib/reinject'
+import { isTargetHost } from '../lib/site'
 import { writeState } from '../lib/state'
 import type { ExtractCommand, ExtractResult, StateUpdateMessage } from '../types'
 
-// Open the side panel when the toolbar icon is clicked.
-chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {})
+// The panel must exist ONLY on the EnrichAI host. `openPanelOnActionClick` opens a
+// GLOBAL panel — a window-level surface that stays visible on every tab and ignores
+// per-tab disabling — which is why it used to linger after navigating away. Instead
+// keep the panel disabled by default and open it explicitly, tab-scoped, from the
+// toolbar click (see the action.onClicked handler below), so it belongs to that tab
+// alone and closes as soon as a non-target tab (which syncPanel disables) is shown.
+chrome.sidePanel.setOptions({ enabled: false }).catch(() => {})
+// Explicitly opt OUT of the global open-on-click behavior. It persists across
+// updates, so a build that previously enabled it would otherwise keep opening the
+// global panel and suppress the action.onClicked handler below.
+chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: false }).catch(() => {})
+
+// Toolbar icon: open the tab-scoped panel, but only on the target host. open() must
+// run synchronously inside the user-gesture, so it is not awaited. syncPanel has
+// already enabled this tab (on activation/load), which open() requires.
+chrome.action.onClicked.addListener((tab) => {
+  if (tab.id === undefined || !isTargetHost(tab.url)) return
+  chrome.sidePanel.open({ tabId: tab.id }).catch(() => {})
+})
 
 // After the extension installs, updates, or reloads (e.g. a rebuild during
 // development), the content script already injected into open EnrichAI tabs is
