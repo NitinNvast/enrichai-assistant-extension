@@ -17,18 +17,40 @@ function computeState(): DetectionState {
 }
 
 let lastSerialized = ''
+let alive = true
+let disconnectObserver: (() => void) | null = null
+
 function report(): void {
+  if (!alive) return
   const state = computeState()
   const serialized = JSON.stringify(state)
   if (serialized === lastSerialized) return
   lastSerialized = serialized
   const msg: StateUpdateMessage = { type: 'STATE_UPDATE', state }
-  chrome.runtime.sendMessage(msg).catch(() => {})
+  try {
+    // Once the extension is reloaded/updated, this injected script is orphaned:
+    // chrome.runtime.id goes undefined and sendMessage throws SYNCHRONOUSLY
+    // ("Extension context invalidated"), so .catch() alone can't guard it. Tear
+    // down instead of letting the dead script keep throwing on every mutation.
+    if (!chrome.runtime?.id) throw new Error('extension context invalidated')
+    chrome.runtime.sendMessage(msg).catch(() => {})
+  } catch {
+    teardown()
+  }
+}
+
+function teardown(): void {
+  if (!alive) return
+  alive = false
+  disconnectObserver?.()
+  disconnectObserver = null
+  window.removeEventListener('popstate', report)
 }
 
 function start(): void {
   report()
-  watchDom(document.documentElement, report, 250)
+  if (!alive) return // context was already dead on the first report
+  disconnectObserver = watchDom(document.documentElement, report, 250)
   patchHistory(report)
   window.addEventListener('popstate', report)
 }
