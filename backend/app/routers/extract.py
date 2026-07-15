@@ -22,6 +22,14 @@ def _match_allowed(value: str, allowed: list[str]) -> str:
     return ""
 
 
+def _match_allowed_many(values: list[str], allowed: list[str]) -> list[str]:
+    """Canonicalize each value to its allowed spelling, drop non-matches and
+    duplicates, and order the survivors by their position in `allowed`."""
+    matched = {_match_allowed(v, allowed) for v in values}
+    matched.discard("")
+    return [candidate for candidate in allowed if candidate in matched]
+
+
 @router.post("/extract", response_model=ExtractResponse)
 @limiter.limit(lambda: get_settings().rate_limit)
 def extract(request: Request, req: ExtractRequest) -> ExtractResponse:
@@ -41,9 +49,9 @@ def _extract(req: ExtractRequest) -> ExtractResponse:
     except LLMError:
         raise AppError(502, "upstream_error", "The classification service failed.")
 
-    classification = _match_allowed(raw, req.guidelines.allowedValues)
+    classifications = _match_allowed_many(raw, req.guidelines.allowedValues)
     return ExtractResponse(
         attribute=req.attributeName,
-        classification=classification,
+        classifications=classifications,
         model=settings.openai_model,
     )

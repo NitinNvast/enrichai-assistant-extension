@@ -9,18 +9,23 @@ class LLMError(Exception):
     """Raised when the OpenAI call fails."""
 
 
-def classify_attribute(messages: list[dict], model: str, allowed_values: list[str]) -> str:
+def classify_attribute(messages: list[dict], model: str, allowed_values: list[str]) -> list[str]:
     settings = get_settings()
     client = OpenAI(api_key=settings.openai_api_key)
 
-    # Structured output: constrain `classification` to the allowed values (plus
-    # "" for "not confident") so the model cannot return prose or invented values.
+    # Structured output: `classifications` is an array whose items are constrained
+    # to the allowed values, so the model can return one, several, or none — but
+    # never a value outside the vocabulary. An empty array means "nothing applies".
     schema = {
         "type": "object",
         "properties": {
-            "classification": {"type": "string", "enum": [*allowed_values, ""]},
+            "classifications": {
+                "type": "array",
+                "items": {"type": "string", "enum": allowed_values},
+                "uniqueItems": True,
+            },
         },
-        "required": ["classification"],
+        "required": ["classifications"],
         "additionalProperties": False,
     }
 
@@ -42,4 +47,7 @@ def classify_attribute(messages: list[dict], model: str, allowed_values: list[st
         data = json.loads(content)
     except json.JSONDecodeError as exc:
         raise LLMError(f"invalid JSON from model: {content!r}") from exc
-    return str(data.get("classification", ""))
+    values = data.get("classifications", [])
+    if not isinstance(values, list):
+        return []
+    return [str(v) for v in values]

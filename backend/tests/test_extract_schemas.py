@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from app.schemas import ExtractRequest
+from app.schemas import ExtractRequest, ExtractResponse
 
 VALID = {
     "attributeName": "Fit - Shoe Width",
@@ -28,3 +28,8 @@ def test_context_defaults_to_nulls():
     body = {k: v for k, v in VALID.items() if k != "context"}
     req = ExtractRequest(**body)
     assert req.context.projectId is None
+
+
+def test_extract_response_holds_classifications_list():
+    r = ExtractResponse(attribute="A", classifications=["X", "Y"], model="m")
+    assert r.classifications == ["X", "Y"]

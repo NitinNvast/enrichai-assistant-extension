@@ -16,7 +16,7 @@ VALID_BODY = {
 
 @pytest.fixture(autouse=True)
 def mock_llm(monkeypatch):
-    monkeypatch.setattr(openai_client, "classify_attribute", lambda messages, model, allowed: "Wide")
+    monkeypatch.setattr(openai_client, "classify_attribute", lambda messages, model, allowed: ["Wide"])
 
 
 def test_extract_success():
@@ -24,21 +24,33 @@ def test_extract_success():
     assert resp.status_code == 200
     data = resp.json()
     assert data["attribute"] == "Fit - Shoe Width"
-    assert data["classification"] == "Wide"
+    assert data["classifications"] == ["Wide"]
     assert data["model"]
 
 
-def test_extract_coerces_out_of_list_value(monkeypatch):
-    monkeypatch.setattr(openai_client, "classify_attribute", lambda messages, model, allowed: "Enormous")
+def test_extract_returns_multiple_ordered_by_allowed(monkeypatch):
+    monkeypatch.setattr(openai_client, "classify_attribute", lambda m, model, a: ["Wide", "Narrow"])
     resp = client.post("/api/extract", json=VALID_BODY)
-    assert resp.status_code == 200
-    assert resp.json()["classification"] == ""
+    # Ordered by allowedValues order: Narrow (index 0) before Wide (index 2).
+    assert resp.json()["classifications"] == ["Narrow", "Wide"]
 
 
-def test_extract_matches_allowed_case_insensitively(monkeypatch):
-    monkeypatch.setattr(openai_client, "classify_attribute", lambda messages, model, allowed: "wide")
+def test_extract_drops_out_of_list_values(monkeypatch):
+    monkeypatch.setattr(openai_client, "classify_attribute", lambda m, model, a: ["Enormous", "Wide"])
     resp = client.post("/api/extract", json=VALID_BODY)
-    assert resp.json()["classification"] == "Wide"  # canonical casing echoed
+    assert resp.json()["classifications"] == ["Wide"]
+
+
+def test_extract_dedupes_and_canonicalizes(monkeypatch):
+    monkeypatch.setattr(openai_client, "classify_attribute", lambda m, model, a: ["wide", "Wide"])
+    resp = client.post("/api/extract", json=VALID_BODY)
+    assert resp.json()["classifications"] == ["Wide"]
+
+
+def test_extract_empty_when_nothing_applies(monkeypatch):
+    monkeypatch.setattr(openai_client, "classify_attribute", lambda m, model, a: [])
+    resp = client.post("/api/extract", json=VALID_BODY)
+    assert resp.json()["classifications"] == []
 
 
 def test_extract_missing_attribute_is_invalid_request():
