@@ -30,7 +30,9 @@ function identityOf(state: DetectionState | null): string {
 export default function App() {
   const [state, setState] = useState<DetectionState | null>(null)
   const [phase, setPhase] = useState<Phase>('idle')
-  const [result, setResult] = useState<{ attribute: string; classifications: string[] } | null>(null)
+  const [result, setResult] = useState<{ attribute: string; classifications: string[]; explanation: string } | null>(
+    null,
+  )
   const [error, setError] = useState('')
   // Identity (product + attribute) that the current `result`/`error` belongs to. Cleared
   // whenever a new DetectionState arrives for a different product/attribute so stale
@@ -138,7 +140,11 @@ export default function App() {
       // resurrecting a result/error for a product/attribute that's no longer displayed.
       if (requestIdentity !== currentIdentityRef.current) return
       if (res.ok) {
-        setResult({ attribute: res.data.attribute, classifications: res.data.classifications })
+        setResult({
+          attribute: res.data.attribute,
+          classifications: res.data.classifications,
+          explanation: res.data.explanation,
+        })
         setPhase('done')
       } else {
         setError(res.error.message)
@@ -206,6 +212,12 @@ export default function App() {
             </ul>
           ) : (
             <p className="mt-1 text-lg font-semibold text-gray-500">No confident value</p>
+          )}
+          {result.explanation && (
+            <>
+              <p className="mt-3 font-medium">Why</p>
+              <p className="mt-1 whitespace-pre-line text-gray-600">{result.explanation}</p>
+            </>
           )}
         </section>
       )}

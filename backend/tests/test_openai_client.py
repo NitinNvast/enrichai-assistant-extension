@@ -36,19 +36,25 @@ def _fake_client_returning(content):
 
 def test_classify_attribute_parses_list(monkeypatch):
     monkeypatch.setattr(
-        openai_client, "OpenAI", _fake_client_returning(json.dumps({"classifications": ["Wide"]}))
+        openai_client,
+        "OpenAI",
+        _fake_client_returning(json.dumps({"classifications": ["Wide"], "explanation": "spec: Wide Fit"})),
     )
     result = openai_client.classify_attribute(
         [{"role": "user", "content": "x"}], "gpt-4o", ["Narrow", "Wide"]
     )
-    assert result == ["Wide"]
+    assert result.classifications == ["Wide"]
+    assert result.explanation == "spec: Wide Fit"
 
 
 def test_classify_attribute_empty_list(monkeypatch):
     monkeypatch.setattr(
-        openai_client, "OpenAI", _fake_client_returning(json.dumps({"classifications": []}))
+        openai_client,
+        "OpenAI",
+        _fake_client_returning(json.dumps({"classifications": [], "explanation": "nothing applies"})),
     )
     result = openai_client.classify_attribute(
         [{"role": "user", "content": "x"}], "gpt-4o", ["Narrow", "Wide"]
     )
-    assert result == []
+    assert result.classifications == []
+    assert result.explanation == "nothing applies"

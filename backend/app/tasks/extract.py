@@ -42,9 +42,18 @@ SYSTEM_PROMPT = (
     "4. Category\n"
     "5. Other product information\n\n"
     "Output Rules:\n"
-    "- Return a JSON array.\n"
     "- Include every applicable allowed value.\n"
-    "- Return [] if confidence is insufficient."
+    "- Return [] if confidence is insufficient.\n"
+    "- Always provide a concise explanation (2-3 lines) describing why the "
+    "classification resulted in the selected allowed value(s) or an empty "
+    "array ([]).\n"
+    "- The explanation must reference the product evidence (such as the "
+    "description, product name, specifications, category, or other product "
+    "details) and briefly explain the reasoning used to reach the decision.\n"
+    "- If returning [], clearly state why the available information was "
+    "insufficient, ambiguous, or did not support any allowed value.\n"
+    "- Keep the explanation factual, concise, and free of chain-of-thought or "
+    "internal reasoning.\n"
 )
 
 

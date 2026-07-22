@@ -21,7 +21,7 @@ def test_prompt_instructs_multi_value_selection():
     guidelines = GuidelinesIn(instructions="x", allowedValues=["Narrow", "Wide"])
     product = ProductIn(name="Shoe", description="d", specifications={})
     system = build_attribute_prompt("Fit - Shoe Width", guidelines, product)[0]["content"]
-    assert "EVERY allowed value" in system
+    assert "every allowed value that applies" in system
     assert "empty list" in system
 
 
@@ -29,5 +29,12 @@ def test_prompt_requires_grounding_in_product_details():
     guidelines = GuidelinesIn(instructions="x", allowedValues=["Narrow", "Wide"])
     product = ProductIn(name="Shoe", description="d", specifications={})
     system = build_attribute_prompt("Fit - Shoe Width", guidelines, product)[0]["content"]
-    assert "only on the provided product details" in system
     assert "do not guess" in system
+    assert "do not invent" in system
+
+
+def test_prompt_requests_explanation():
+    guidelines = GuidelinesIn(instructions="x", allowedValues=["Narrow", "Wide"])
+    product = ProductIn(name="Shoe", description="d", specifications={})
+    system = build_attribute_prompt("Fit - Shoe Width", guidelines, product)[0]["content"]
+    assert "explanation" in system.lower()

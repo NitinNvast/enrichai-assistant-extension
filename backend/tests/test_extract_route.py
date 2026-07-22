@@ -16,7 +16,9 @@ VALID_BODY = {
 
 @pytest.fixture(autouse=True)
 def mock_llm(monkeypatch):
-    monkeypatch.setattr(openai_client, "classify_attribute", lambda messages, model, allowed: ["Wide"])
+    monkeypatch.setattr(
+        openai_client, "classify_attribute", lambda messages, model, allowed: (["Wide"], "spec says Wide Fit")
+    )
 
 
 def test_extract_success():
@@ -25,32 +27,34 @@ def test_extract_success():
     data = resp.json()
     assert data["attribute"] == "Fit - Shoe Width"
     assert data["classifications"] == ["Wide"]
+    assert data["explanation"] == "spec says Wide Fit"
     assert data["model"]
 
 
 def test_extract_returns_multiple_ordered_by_allowed(monkeypatch):
-    monkeypatch.setattr(openai_client, "classify_attribute", lambda m, model, a: ["Wide", "Narrow"])
+    monkeypatch.setattr(openai_client, "classify_attribute", lambda m, model, a: (["Wide", "Narrow"], "why"))
     resp = client.post("/api/extract", json=VALID_BODY)
     # Ordered by allowedValues order: Narrow (index 0) before Wide (index 2).
     assert resp.json()["classifications"] == ["Narrow", "Wide"]
 
 
 def test_extract_drops_out_of_list_values(monkeypatch):
-    monkeypatch.setattr(openai_client, "classify_attribute", lambda m, model, a: ["Enormous", "Wide"])
+    monkeypatch.setattr(openai_client, "classify_attribute", lambda m, model, a: (["Enormous", "Wide"], "why"))
     resp = client.post("/api/extract", json=VALID_BODY)
     assert resp.json()["classifications"] == ["Wide"]
 
 
 def test_extract_dedupes_and_canonicalizes(monkeypatch):
-    monkeypatch.setattr(openai_client, "classify_attribute", lambda m, model, a: ["wide", "Wide"])
+    monkeypatch.setattr(openai_client, "classify_attribute", lambda m, model, a: (["wide", "Wide"], "why"))
     resp = client.post("/api/extract", json=VALID_BODY)
     assert resp.json()["classifications"] == ["Wide"]
 
 
 def test_extract_empty_when_nothing_applies(monkeypatch):
-    monkeypatch.setattr(openai_client, "classify_attribute", lambda m, model, a: [])
+    monkeypatch.setattr(openai_client, "classify_attribute", lambda m, model, a: ([], "no evidence found"))
     resp = client.post("/api/extract", json=VALID_BODY)
     assert resp.json()["classifications"] == []
+    assert resp.json()["explanation"] == "no evidence found"
 
 
 def test_extract_missing_attribute_is_invalid_request():

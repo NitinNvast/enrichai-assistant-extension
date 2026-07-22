@@ -18,7 +18,9 @@ BODY = {
 
 @pytest.fixture(autouse=True)
 def mock_classify(monkeypatch):
-    monkeypatch.setattr(openai_client, "classify_attribute", lambda messages, model, allowed: "Wide")
+    monkeypatch.setattr(
+        openai_client, "classify_attribute", lambda messages, model, allowed: (["Wide"], "spec says Wide Fit")
+    )
 
 
 def test_cors_header_present_for_allowed_origin():

@@ -48,7 +48,9 @@ def _extract(req: ExtractRequest) -> ExtractResponse:
     settings = get_settings()
     messages = build_attribute_prompt(req.attributeName, req.guidelines, req.product)
     try:
-        raw = openai_client.classify_attribute(messages, settings.openai_model, req.guidelines.allowedValues)
+        raw, explanation = openai_client.classify_attribute(
+            messages, settings.openai_model, req.guidelines.allowedValues
+        )
     except LLMError as exc:
         logger.warning("classify_attribute failed (model=%s): %s", settings.openai_model, exc)
         raise AppError(502, "upstream_error", "The classification service failed.") from exc
@@ -57,5 +59,6 @@ def _extract(req: ExtractRequest) -> ExtractResponse:
     return ExtractResponse(
         attribute=req.attributeName,
         classifications=classifications,
+        explanation=explanation,
         model=settings.openai_model,
     )

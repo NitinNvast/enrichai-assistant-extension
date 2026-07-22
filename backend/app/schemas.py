@@ -28,6 +28,7 @@ class ExtractRequest(BaseModel):
 class ExtractResponse(BaseModel):
     attribute: str
     classifications: list[str]
+    explanation: str = ""
     model: str
 
 

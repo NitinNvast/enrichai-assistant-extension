@@ -1,4 +1,5 @@
 import json
+from typing import NamedTuple
 
 from openai import OpenAI, OpenAIError
 
@@ -9,7 +10,14 @@ class LLMError(Exception):
     """Raised when the OpenAI call fails."""
 
 
-def classify_attribute(messages: list[dict], model: str, allowed_values: list[str]) -> list[str]:
+class ClassificationResult(NamedTuple):
+    classifications: list[str]
+    explanation: str
+
+
+def classify_attribute(
+    messages: list[dict], model: str, allowed_values: list[str]
+) -> ClassificationResult:
     settings = get_settings()
     client = OpenAI(api_key=settings.openai_api_key)
 
@@ -25,8 +33,9 @@ def classify_attribute(messages: list[dict], model: str, allowed_values: list[st
                 "type": "array",
                 "items": {"type": "string", "enum": allowed_values},
             },
+            "explanation": {"type": "string"},
         },
-        "required": ["classifications"],
+        "required": ["classifications", "explanation"],
         "additionalProperties": False,
     }
 
@@ -50,5 +59,8 @@ def classify_attribute(messages: list[dict], model: str, allowed_values: list[st
         raise LLMError(f"invalid JSON from model: {content!r}") from exc
     values = data.get("classifications", [])
     if not isinstance(values, list):
-        return []
-    return [str(v) for v in values]
+        values = []
+    explanation = data.get("explanation", "")
+    if not isinstance(explanation, str):
+        explanation = ""
+    return ClassificationResult([str(v) for v in values], explanation)
