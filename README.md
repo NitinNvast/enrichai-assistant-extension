@@ -74,7 +74,7 @@ Runs the backend in a container using `backend/.env` for configuration.
 
 ```bash
 # from the repo root, with backend/.env populated (see above)
-docker compose up --build backend
+docker compose up -d --build backend
 ```
 
 The container exposes the API on http://localhost:8000 (same health check and docs URLs as above). Stop it with `Ctrl+C`, or run detached with `docker compose up -d --build backend` and stop with `docker compose down`.
