@@ -1,6 +1,24 @@
+# Python
 .venv/
 __pycache__/
 *.pyc
+*.egg-info/
+
+# Secrets / local env (never bake into the image)
 .env
-.pytest_cache/
+.env.*
+
+# Tests & caches (not needed at runtime)
 tests/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Docker / VCS meta (build context doesn't need these)
+Dockerfile
+.dockerignore
+.git/
+.gitignore
+
+# OS cruft
+.DS_Store
